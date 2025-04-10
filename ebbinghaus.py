@@ -24,7 +24,7 @@ fig = px.bar(sprzedaz_melted,
              labels={'Miasto': 'Miasto sprzedaży',
                      'Sprzedaż': 'Liczba sprzedanych produktów',
                      'Produkt': 'Rodzaj produktu'},
-             template='presentation')
+             template='simple_white')
 
 fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 
