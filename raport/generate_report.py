@@ -9,9 +9,11 @@ import io
 import base64
 from PIL import Image
 
+
 def ensure_output_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
+
 
 def generate_top_10_teams(output_dir):
     cs = pd.read_csv(os.path.join("data", "constructor_standings.csv"))
@@ -56,7 +58,7 @@ def generate_top_10_teams(output_dir):
     plt.barh(top10_plt["name"], top10_plt["championships"], color=colors, edgecolor="black")
     plt.xlabel("Liczba mistrzostw konstruktorów")
     plt.ylabel("Zespół")
-    plt.title("Top 10 konstruktorów według liczby tytułów")
+    plt.title("Ranking 10 najlepszych konstruktorów według liczby tytułów")
     plt.tight_layout()
     img_path = os.path.join(output_dir, "top_10_teams.png")
     plt.savefig(img_path)
@@ -72,6 +74,7 @@ def generate_top_10_teams(output_dir):
     fig.update_layout(xaxis_tickangle=-45)
     div = plot(fig, output_type="div", include_plotlyjs=False)
     return img_path, div
+
 
 def generate_avg_pit_stop(output_dir):
     pit_stops = pd.read_csv(os.path.join("data", "pit_stops.csv"))
@@ -111,7 +114,7 @@ def generate_avg_pit_stop(output_dir):
     plt.bar(avg_sorted["name"], avg_sorted["seconds"], color=colors, edgecolor="black")
     plt.xlabel("Drużyna")
     plt.ylabel("Średni czas pit stopu (sekundy)")
-    plt.title("Średni czas pit stopu według drużyn w sezonie 2021")
+    plt.title("Średni czas pit stopu według zespołów w sezonie 2021")
     plt.ylim(20, 30)
     plt.xlim(-1, 10)
     plt.hlines(general_avg, -1, 10, color="black", linestyles="dashed")
@@ -132,6 +135,7 @@ def generate_avg_pit_stop(output_dir):
     div = plot(fig, output_type="div", include_plotlyjs=False)
     return img_path, div
 
+
 def generate_number_of_races(output_dir):
     races = pd.read_csv(os.path.join("data", "races.csv"))
     races_per_season = races.groupby("year").size().reset_index(name="num_races")
@@ -142,7 +146,7 @@ def generate_number_of_races(output_dir):
     plt.xlabel("Sezon (rok)")
     plt.ylabel("Liczba wyścigów")
     plt.ylim((0, max(races_per_season["num_races"]) + 1))
-    plt.title("Liczba wyścigów na sezon")
+    plt.title("Liczba wyścigów w latach 1950-2024")
     plt.vlines(
         [2020, 2023],
         0,
@@ -158,6 +162,7 @@ def generate_number_of_races(output_dir):
     plt.savefig(img_path)
     plt.close()
     return img_path
+
 
 def generate_ham_vs_ver(output_dir):
     drivers = pd.read_csv(os.path.join("data", "drivers.csv"))
@@ -199,7 +204,7 @@ def generate_ham_vs_ver(output_dir):
         color='Driver',
         color_discrete_map=color_map,
         markers=True,
-        title='2021: Punkty zdobyte na wyścig – Verstappen vs Hamilton',
+        title='Punkty zdobyte na wyścig – Verstappen vs Hamilton w sezonie 2021',
         labels={'round': 'Runda', 'Points': 'Punkty w wyścigu'}
     )
     fig_pts.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
@@ -212,12 +217,13 @@ def generate_ham_vs_ver(output_dir):
         color='Driver',
         color_discrete_map=color_map,
         markers=True,
-        title='2021: Skumulowane punkty – Verstappen vs Hamilton',
+        title='Skumulowane zdobyte punkty – Verstappen vs Hamilton w sezonie 2021',
         labels={'round': 'Runda', 'Cumulative Points': 'Skumulowane punkty'}
     )
     fig_cum.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
     div_cum = plot(fig_cum, output_type="div", include_plotlyjs=True)
     return div_pts, div_cum
+
 
 def generate_retirements_per_track(output_dir):
     races = pd.read_csv(os.path.join("data", "races.csv"))
@@ -238,7 +244,7 @@ def generate_retirements_per_track(output_dir):
     retirements = results_with_circuit[
         (~results_with_circuit["status"].eq("Finished"))
         & (~results_with_circuit["status"].str.startswith("+"))
-    ]
+        ]
     retirements_count = (
         retirements.groupby("name").size().reset_index(name="retirements_count")
     )
@@ -254,7 +260,7 @@ def generate_retirements_per_track(output_dir):
     )
     plt.xlabel("Liczba wycofań")
     plt.ylabel("Tor wyścigowy")
-    plt.title("Liczba wycofań według toru w sezonie 2021")
+    plt.title("DNF-y według toru w sezonie 2021")
     plt.tight_layout()
     img_path = os.path.join(output_dir, "retirements_per_track.png")
     plt.savefig(img_path)
@@ -284,26 +290,30 @@ def generate_retirements_per_constructor(output_dir):
     dnf = results[
         (~results["status"].str.startswith("+")) &
         (~results["status"].isin(["Finished", "Disqualified", "Not classified"]))
-    ]
+        ]
     category_map = {
         "Kolizja": ["Collision", "Accident", "Spun off", "Collision damage", "Debris"],
-        "Silnik": ["Engine", "Engine fire", "Engine misfire", "Oil leak", "Oil pressure", "Oil pump", "Oil pipe", "Crankshaft", "Ignition", "Spark plugs", "Turbo", "Oil line"],
-        "Skrzynia biegów / Przeniesienie napędu": ["Gearbox", "Transmission", "Clutch", "Drivetrain", "Differential", "Halfshaft", "Axle", "CV joint"],
+        "Silnik": ["Engine", "Engine fire", "Engine misfire", "Oil leak", "Oil pressure", "Oil pump", "Oil pipe",
+                   "Crankshaft", "Ignition", "Spark plugs", "Turbo", "Oil line"],
+        "Skrzynia biegów / Przeniesienie napędu": ["Gearbox", "Transmission", "Clutch", "Drivetrain", "Differential",
+                                                   "Halfshaft", "Axle", "CV joint"],
         "Układ elektryczny": ["Electrical", "Electronics", "Battery", "Magneto", "Ignition", "Distributor"],
-        "Chłodzenie": ["Radiator", "Water pressure", "Water leak", "Cooling system", "Water pump", "Water pipe", "Heat shield fire"],
-        "Zawieszenie / Kierowanie": ["Suspension", "Steering", "Handling", "Rear wing", "Front wing", "Broken wing", "Chassis", "Undertray"],
+        "Zawieszenie / Kierowanie": ["Suspension", "Steering", "Handling", "Rear wing", "Front wing", "Broken wing",
+                                     "Chassis", "Undertray"],
         "Hamulce": ["Brakes", "Brake duct"],
         "Opony": ["Tyre", "Puncture", "Tyre puncture", "Wheel", "Wheel nut", "Wheel rim"],
-        "Układ paliwowy": ["Fuel", "Fuel leak", "Fuel pump", "Fuel pressure", "Fuel pipe", "Fuel rig", "Injection"],
         "Jednostka napędowa / ERS": ["Power loss", "Power Unit", "ERS"],
-        "Usterka mechaniczna": ["Mechanical", "Technical", "Damage", "Stalled", "Throttle", "Vibrations", "Mechanical", "Seat", "Driver Seat"],
-        "Inne": ["Not restarted", "Injury", "Driver unwell", "Illness", "Safety belt", "Excluded", "Retired", "Withdrew", "Did not qualify", "107% Rule", "Disqualified", "Physical", "Safety concerns"]
+        "Usterka mechaniczna": ["Mechanical", "Technical", "Damage", "Stalled", "Throttle", "Vibrations", "Mechanical",
+                                "Seat", "Driver Seat"],
+        "Inne": ["Not restarted", "Injury", "Driver unwell", "Illness", "Safety belt", "Excluded", "Retired",
+                 "Withdrew", "Did not qualify", "107% Rule", "Disqualified", "Physical", "Safety concerns"]
     }
     reverse_map = {}
     for category, terms in category_map.items():
         for term in terms:
             reverse_map[term] = category
 
+    dnf = dnf.copy()
     dnf["Kategoria"] = dnf["status"].map(reverse_map).fillna("Inne")
     grouped = dnf.groupby(["name", "Kategoria"]).size().unstack(fill_value=0)
     categories_order = [
@@ -311,11 +321,9 @@ def generate_retirements_per_constructor(output_dir):
         "Silnik",
         "Skrzynia biegów / Przeniesienie napędu",
         "Układ elektryczny",
-        "Chłodzenie",
         "Zawieszenie / Kierowanie",
         "Hamulce",
         "Opony",
-        "Układ paliwowy",
         "Jednostka napędowa / ERS",
         "Usterka mechaniczna",
         "Inne"
@@ -330,18 +338,16 @@ def generate_retirements_per_constructor(output_dir):
         "#108010",
         "#b40c0d",
         "#74499c",
-        "#6d392e",
         "#c159a1",
         "#a65628",
         "#272727",
-        "#818108",
         "#009dae",
         "#dbdb79",
         "#C7C7C7",
     ]
     fig, ax = plt.subplots(figsize=(14, 8))
     grouped.plot(kind="barh", stacked=True, color=colors, edgecolor="black", ax=ax)
-    ax.set_title("DNF-y konstruktorów wg przyczyn (sezon 2021)")
+    ax.set_title("DNF-y konstruktorów z uwzględnieniem przyczyn w sezonie 2021")
     ax.set_xlabel("Liczba DNF")
     ax.set_ylabel("Konstruktor")
     ax.xaxis.set_minor_locator(plt.MultipleLocator(1))
@@ -373,7 +379,6 @@ def generate_top_10_drivers_by_wins(output_dir):
     top_winners = top_winners.sort_values(by="wins", ascending=False).reset_index(drop=True)
     top_10_winners = top_winners.head(10).copy()
     top_10_winners_plt = top_10_winners.sort_values(by="wins", ascending=True)
-
     num_bars = len(top_10_winners_plt)
     colors = plt.cm.get_cmap("tab10")(range(num_bars))
 
@@ -381,7 +386,7 @@ def generate_top_10_drivers_by_wins(output_dir):
     plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors, edgecolor="black")
     plt.xlabel("Liczba zwycięstw")
     plt.ylabel("Kierowca")
-    plt.title("10 najlepszych kierowców według liczby zwycięstw")
+    plt.title("Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw")
     plt.tight_layout()
     img_path = os.path.join(output_dir, "top_10_drivers_by_wins.png")
     plt.savefig(img_path)
@@ -391,12 +396,13 @@ def generate_top_10_drivers_by_wins(output_dir):
         top_10_winners,
         x="full_name",
         y="wins",
-        title="10 najlepszych kierowców według liczby zwycięstw",
+        title="Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw",
         labels={"full_name": "Kierowca", "wins": "Liczba zwycięstw"},
     )
     fig.update_layout(xaxis_tickangle=-45)
     div = plot(fig, output_type="div", include_plotlyjs=False)
     return img_path, div
+
 
 def generate_laps_per_position(output_dir, year=2021):
     lap_times = pd.read_csv(os.path.join("data", "lap_times.csv"))
@@ -444,7 +450,7 @@ def generate_laps_per_position(output_dir, year=2021):
 
     ax.set_xlabel('Pozycja')
     ax.set_ylabel('Kierowca')
-    ax.set_title(f'Liczba okrążeń spędzonych na każdej pozycji przez kierowcę w sezonie {year}')
+    ax.set_title(f'Liczba okrążeń spędzonych na poszczególnych pozycjach przez kierowcę w sezonie {year}')
     fig.colorbar(c, ax=ax, label='Liczba okrążeń')
 
     plt.tight_layout()
@@ -453,6 +459,7 @@ def generate_laps_per_position(output_dir, year=2021):
     plt.close()
 
     return img_path
+
 
 def generate_world_map(output_dir):
     races = pd.read_csv(os.path.join("data", "races.csv"))
@@ -471,9 +478,9 @@ def generate_world_map(output_dir):
         'lng': 'longitude'
     })
     winners_2021 = results[(
-        results["positionText"] == "1")
-        & (results["raceId"].isin(races_2021["raceId"]))
-    ][["raceId", "driverId"]].merge(
+                                   results["positionText"] == "1")
+                           & (results["raceId"].isin(races_2021["raceId"]))
+                           ][["raceId", "driverId"]].merge(
         drivers[
             [
                 "driverId",
@@ -544,80 +551,92 @@ def generate_world_map(output_dir):
     m.save(map_path)
     return map_path
 
+
 def build_html_report(output_dir, html_path):
     ensure_output_dir(output_dir)
 
     sections = []
 
-    img_t10, div_t10 = generate_top_10_teams(output_dir)
-    desc_t10 = "Wykres przedstawia dziesięć zespołów z największą liczbą mistrzostw konstruktorów w historii Formuły 1."
-    sections.append(("Top 10 zespołów wg mistrzostw", desc_t10, img_t10, div_t10))
-
-    img_pit, div_pit = generate_avg_pit_stop(output_dir)
-    desc_pit = "Średni czas pit stopów poszczególnych zespołów podczas sezonu 2021, z odfiltrowaniem anomalii powyżej 120 sekund."
-    sections.append(("Średni czas pit stopu (2021)", desc_pit, img_pit, div_pit))
-
     img_races = generate_number_of_races(output_dir)
-    desc_races = "Trend liczby wyścigów rozgrywanych w sezonach Formuły 1 na przestrzeni lat, z zaznaczeniem okresu pandemii COVID-19 (2020-2023)."
-    sections.append(("Liczba wyścigów na sezon", desc_races, img_races, None))
+    long_desc_races = "Powyższy wykres liniowy obrazuje, jak w poszczególnych latach rosła liczba wyścigów Formuły 1 od początku istniania 1950 do 2024. Na osi poziomej znajduje się rok, natomiast oś pionowa przedstawia liczbę Grand Prix (rund) rozgrywanych w danym sezonie. Punkty i łącząca je linia pokazują stopniowy wzrost ilości organizowanych rajdów od około 10 wyścigów w latach 50. do około 16–17 w latach 80. i 90., a później aż do rekordowych 22–24 wyścigów w ostatnich latach. Dodatkowo, czerwone, przerywane pionowe linie oraz wypełnione tło oznaczają okres pandemii COVID-19 (2020–2023), kiedy kalendarz uległ skróceniu (np. w 2020 roku spadek do 17 wyścigów). Dzięki tej wizualizacji łatwo dostrzec ogólny trend rozrostu mistrzostw oraz wyjątkowe odchylenia spowodowane globalnymi wydarzeniami."
+    sections.append(("Liczba wyścigów w latach 1950-2024", img_races, None, long_desc_races))
 
-    div_ham_pts, div_ham_cum = generate_ham_vs_ver(output_dir)
-    desc_ham = "Porównanie punktów zdobywanych przez Lewisa Hamiltona i Maxa Verstappena w sezonie 2021: punkty za każdy wyścig oraz skumulowane punkty."
-    sections.append(("Hamilton vs Verstappen (2021)", desc_ham, None, div_ham_pts + div_ham_cum))
-
-    img_ret, div_ret = generate_retirements_per_track(output_dir)
-    desc_ret = "Liczba wycofań (DNF) na poszczególnych torach podczas sezonu 2021. Tor Hungaroring wyróżniony kolorem czerwonym."
-    sections.append(("Wycofania według toru (2021)", desc_ret, img_ret, div_ret))
-
-    img_ret = generate_retirements_per_constructor(output_dir)
-    desc_ret = "Liczba wycofań (DNF) poszczególnych konstruktorów podczas sezonu 2021 z podziałem na przyczyny."
-    sections.append(("Wycofania według konstruktorów (2021)", desc_ret, img_ret, None))
+    img_t10, div_t10 = generate_top_10_teams(output_dir)
+    long_desc_t10 = "Powyższy wykres prezentuje dziesięć najbardziej utytułowanych zespołów w historii Formuły 1. Oś pionowa zawiera nazwy konstruktorów, natomiast oś pozioma to łączna liczba zdobytych tytułów mistrza konstruktorów. Ferrari dominuje z 16 tytułami, co stanowi najwyższy wynik, następnie McLaren i Williams posiadają po 9 tytułów każdy, a Mercedes plasuje się na czwartym miejscu z 8. Red Bull może się pochwalić 6 wieńcami, natomiast klasyczne marki, jak Team Lotus (4) czy Cooper-Climax (2), również znalazły się w zestawieniu. Kolory słupków odnoszą się do barw charakterystycznych dla danego zespołu. Taki wykres umożliwia porównanie sukcesów historycznych zespołów i odzwierciedla ewolucję dominacji różnych drużyn."
+    sections.append(("Ranking 10 najlepszych konstruktorów według liczby tytułów", img_t10, None, long_desc_t10))
 
     img_dw, div_dw = generate_top_10_drivers_by_wins(output_dir)
-    desc_dw = "Dziesięciu kierowców z największą liczbą zwycięstw w wyścigach Formuły 1."
-    sections.append(("10 najlepszych kierowców wg zwycięstw", desc_dw, img_dw, div_dw))
+    long_desc_t10_drivers = "Na poziomym wykresie słupkowym zestawiono dziesięciu kierowców, którzy w historii Formuły 1 odnieśli najwięcej triumfów. Oś pionowa prezentuje nazwiska kierowców, zaś oś pozioma – liczbę zwycięstw. Lewis Hamilton stoi na czele z imponującymi 105 wygranymi, tuż za nim Michael Schumacher z 91 zwycięstwami. Max Verstappen, pomimo młodego wieku, osiągnął 63 triumfów, wyprzedzając legendy pokroju Vettela i Prosta."
+    sections.append(
+        ("Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw", img_dw, None, long_desc_t10_drivers))
+
+    img_pit, div_pit = generate_avg_pit_stop(output_dir)
+    long_desc_pit_stop = "Wykres kolumnowy ukazuje, jak efektywne w zmianie kół były poszczególne zespoły w sezonie 2021. Na osi poziomej widnieją nazwy dziesięciu ekip, a na osi pionowej – średni czas pit stopu wyrażony w sekundach.  Przerywana linia pozioma wskazuje ogólną średnią dla wszystkich zespołów (około 25,4 s), co pozwala zorientować się, które zespoły były poniżej lub powyżej tej wartości. Tego typu analiza pokazuje, że Red Bull i Ferrari dysponowały najsprawniej działającymi pit stopami, co często przekładało się na zyski czasowe podczas wyścigów, zaś Haas notował najwolniejsze przestoje, co mogło negatywnie wpływać na ich osiągi w stawce."
+    sections.append(("Średni czas pit stopu według zespołów w sezonie 2021", img_pit, None, long_desc_pit_stop))
+
+    img_ret, div_ret = generate_retirements_per_track(output_dir)
+    long_desc_retirements_per_track = "Powyższy wykres słupkowy przedstawia, ile razy kierowcy musieli wycofać się z wyścigu na każdym torze kalendarza 2021. Na osi pionowej znajdują się nazwy obiektów, a oś pozioma pokazuje liczbę DNF-ów (Did Not Finish) w danym Grand Prix. Największą liczbę wycofań odnotowano na Hungaroringu – aż 7 kierowców nie ukończyło wyścigu, co jest spowodowane ogromnym wypadkiem na pierwszym okrążeniu. Tuż za nim plasuje się Yas Marina (6 DNF-ów), a dalej Monza i Jeddah – po 5. Kolejne obiekty notowały od 4 do zaledwie 1 wycofania (np. Algarve, Barcelona). Dzięki tej wizualizacji można ocenić, na których torach sezonu 2021 najczęściej dochodziło do awarii lub wypadków, co pomaga zrozumieć specyfikę każdego obiektu i wyzwań stawianych przed zawodnikami."
+    sections.append(("DNF-y według toru w sezonie 2021", img_ret, None, long_desc_retirements_per_track))
+
+    img_ret = generate_retirements_per_constructor(output_dir)
+    long_desc_retirements_per_constr = "Stosowany, poziomy wykres słupkowy pokazuje łączną liczbę wycofań (DNF) każdego z dziesięciu zespołów w sezonie 2021 wraz z rozbiciem na kategorie przyczyn. Oś pionowa to nazwy ekip, natomiast oś pozioma – liczba DNF. Poszczególne kolory w słupkach oznaczają konkretne źródło awarii.  Williams zaliczył aż 11 wycofań – najwięcej w stawce; w większości z powodu kolizji (5 DNF), problemy ze skrzynią biegów (3) i inne kategorie. Dzięki takiemu rozbiciu widać, w których zespołach najczęściej dochodziło do wypadków, a w których dominowały awarie techniczne, co może służyć jako punkt wyjścia do analizy niezawodności bolidów i stylu jazdy kierowców poszczególnych dużyn."
+    sections.append(("DNF-y konstruktorów z uwzględnieniem przyczyn w sezonie 2021", img_ret, None,
+                     long_desc_retirements_per_constr))
+
+    div_ham_pts, div_ham_cum = generate_ham_vs_ver(output_dir)
+    long_descr_ham_ver = "Powyższe wykresy przedstawiają sezon Formuły 1 z 2021 roku, porównując wyniki Red Bulla Maxa Verstappena oraz Mercedesa Lewisa Hamiltona. Pierwszy z nich (“Punkty zdobyte na wyścigu”) ilustruje punktację w każdej z 22 rund sezonu. Na osi poziomej oznaczono numer rundy, a na osi pionowej liczbę punktów zdobytych w danym wyścigu. Można zauważyć, że w początkowych wyścigach oba nazwiska wymieniały się na czele: w rundzie 1 Verstappen zdobył maksymalne 25 punktów, podczas gdy Hamilton zdobył 18, w drugiej sytuacja się odwróciła, a następnie oba kierowcy utrzymywali się w okolicach czołówki. Runda 6 przyniosła zerowy dorobek obu zawodników, co odzwierciedla się wspólnym minimum. W kolejnych wyścigach zdarzały się gwałtowne spadki, na przykład Hamilton w rundzie 11 nie zdobył punktów, a Verstappen w tej samej rundzie uzyskał najwyższy wynik. Drugi wykres (“Skumulowane punkty”) prezentuje progres sumarycznej punktacji obu kierowców w miarę upływu kolejnych wyścigów. Linia obu zawodników startuje w tym samym miejscu, ale już od połowy sezonu widać narastającą przewagę Verstappena, która ulegała minimalnym wyrównaniom, np. po rundzie 10 wynik był zbliżony. Do ostatniej rundy sześcio-punktowa różnica między nimi świadczy o niezwykle wyrównanym pojedynku o tytuł, który ostatecznie padł łupem Verstappena."
+    sections.append(("Hamilton vs Verstappen w sezonie 2021", None, div_ham_pts + div_ham_cum, long_descr_ham_ver))
 
     img_laps = generate_laps_per_position(output_dir, year=2021)
-    desc_laps = "Liczba okrążeń spędzonych na każdej pozycji przez kierowcę w sezonie 2021 – mapa cieplna pokazująca dominację kierowców w różnych pozycjach."
-    sections.append(("Okrążenia wg pozycji (2021)", desc_laps, img_laps, None))
+    long_descr_laps_per_pos = "Powyższa mapa cieplna przedstawia, ile okrążeń w sezonie 2021 każdy z wybranych kierowców przejechał na poszczególnych pozycjach od 1. do 20. Wiersze reprezentują nazwiska zawodników  zaś kolumny – miejsca na torze w kolejnych okrążeniach. Kolory skali od granatowego (niewiele okrążeń) przez zielony po żółty i czerwony (dużo okrążeń) wskazują, na których pozycjach dany kierowca spędził najwięcej czasu.  Ta mapa pozwala szybko analizować, jak poszczególni zawodnicy kontrolowali tor i jak długo utrzymywali swoją pozycję w wyścigu, odzwierciedlając ich regularność i konkurencyjność."
+    sections.append(("Liczba okrążeń spędzonych na poszczególnych pozycjach przez kierowcę w sezonie 2021", img_laps,
+                     None, long_descr_laps_per_pos))
 
     # Build HTML
+
     html_parts = [
         "<!DOCTYPE html>",
         "<html>",
+        "<center>",
         "<head>",
         '    <meta charset="utf-8">',
-        "    <title>Raport Formuła 1</title>",
+        "    <title>Analiza wyników Mistrzostw Świata F1</title>",
         "</head>",
+        '<style>:root {--quarto-font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}body {font-family: var(--quarto-font-monospace);}</style>'
         "<body>",
-        "    <h1>Raport wizualizacji danych F1</h1>",
+        "    <h1>Analiza wyników Mistrzostw Świata F1</h1>",
         '    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>'
     ]
 
-    for title, desc, img_path, div in sections:
-        html_parts.append(f"    <h2>{title}</h2>")
-        html_parts.append(f"    <p>{desc}</p>")
-        if img_path:
-            img_name = os.path.basename(img_path)
-            html_parts.append(f'    <img src="{img_name}" alt="{title}" style="max-width:100%;">')
-        if div:
-            html_parts.append(div)
+    for i, section in enumerate(sections):
+        if i == 2:
+            html_parts.append("    <h2 style='margin-top: 150px'>Analiza wyników Mistrzostw Świata F1 sezonu 2021</h2>")
+        html_parts.append(f"    <h2 style='margin-top: 90px'>{section[0]}</h2>")
+        if section[1]:
+            img_name = os.path.basename(section[1])
+            html_parts.append(f'    <img src="static/{img_name}" alt="{section[0]}" style="max-width:100%;">')
+        if section[2]:
+            html_parts.append(section[2])
+        html_parts.append(f"    <p>{section[3]}</p>")
 
     # Add world map section
     map_path = generate_world_map(output_dir)
     desc_map = "Interaktywna mapa torów wyścigowych sezonu 2021 z flagami krajów."
-    html_parts.append("    <h2>Mapa torów wyścigowych (2021)</h2>")
+    html_parts.append("    <h2 style='margin-top: 90px'>Mapa torów wyścigowych (2021)</h2>")
     html_parts.append(f"    <p>{desc_map}</p>")
-    html_parts.append(f'    <iframe src="{os.path.basename(map_path)}" width="100%" height="600"></iframe>')
-
+    html_parts.append(f'    <iframe src="{map_path}" width="75%" height="600"></iframe>')
     html_parts.append("</body>")
+    html_parts.append("</center>")
+    html_parts.append(
+        "<footer style='margin-top: 50px'><p style='text-align: right; margin-right: 15px'>Autorzy: Krzysztof Tarabuła, Kamil Safaryjski</p></footer>")
     html_parts.append("</html>")
 
     with open(html_path, "w", encoding="utf-8") as f:
         f.write("\n".join(html_parts))
 
+
 if __name__ == "__main__":
-    output_dir = "report_output"
-    html_file = os.path.join(output_dir, "report.html")
+    output_dir = "static"
+    html_file = os.path.join("report.html")
     build_html_report(output_dir, html_file)
     print(f"Generated HTML report at {html_file}")
