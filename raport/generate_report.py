@@ -53,7 +53,7 @@ def generate_top_10_teams(output_dir):
     }
     colors = [color_map.get(name, "#aaaaaa") for name in top10_plt["name"]]
     plt.figure(figsize=(10, 6))
-    plt.barh(top10_plt["name"], top10_plt["championships"], color=colors)
+    plt.barh(top10_plt["name"], top10_plt["championships"], color=colors, edgecolor="black")
     plt.xlabel("Liczba mistrzostw konstruktorów")
     plt.ylabel("Zespół")
     plt.title("Top 10 konstruktorów według liczby tytułów")
@@ -200,7 +200,7 @@ def generate_ham_vs_ver(output_dir):
         labels={'round': 'Runda', 'Points': 'Punkty w wyścigu'}
     )
     fig_pts.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
-    div_pts = plot(fig_pts, output_type="div", include_plotlyjs=False)
+    div_pts = plot(fig_pts, output_type="div", include_plotlyjs=True)
 
     fig_cum = px.line(
         df_long_cum,
@@ -213,8 +213,7 @@ def generate_ham_vs_ver(output_dir):
         labels={'round': 'Runda', 'Cumulative Points': 'Skumulowane punkty'}
     )
     fig_cum.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
-    div_cum = plot(fig_cum, output_type="div", include_plotlyjs=False)
-
+    div_cum = plot(fig_cum, output_type="div", include_plotlyjs=True)
     return div_pts, div_cum
 
 def generate_retirements_per_track(output_dir):
@@ -248,7 +247,7 @@ def generate_retirements_per_track(output_dir):
     ]
     plt.figure(figsize=(12, 6))
     plt.barh(
-        retirements_count["name"], retirements_count["retirements_count"], color=colors
+        retirements_count["name"], retirements_count["retirements_count"], color=colors, edgecolor="black"
     )
     plt.xlabel("Liczba wycofań")
     plt.ylabel("Tor wyścigowy")
@@ -291,7 +290,7 @@ def generate_top_10_drivers_by_wins(output_dir):
     colors = plt.cm.get_cmap("tab10")(range(num_bars))
 
     plt.figure(figsize=(10, 6))
-    plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors)
+    plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors, edgecolor="black")
     plt.xlabel("Liczba zwycięstw")
     plt.ylabel("Kierowca")
     plt.title("10 najlepszych kierowców według liczby zwycięstw")
@@ -384,6 +383,14 @@ def generate_world_map(output_dir):
 
     def get_flag_base64(country_name: str) -> str:
         try:
+            if country_name == "USA":
+                country_name = "The United States"
+            elif country_name == "UAE":
+                country_name = "The United Arab Emirates"
+            elif country_name == "UK":
+                country_name = "The United Kingdom"
+            elif country_name == "Netherlands":
+                country_name = "The Netherlands"
             img: Image.Image = fp.get_flag_img(country_name)
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
