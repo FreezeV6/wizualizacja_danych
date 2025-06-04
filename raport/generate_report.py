@@ -456,6 +456,8 @@ def generate_laps_per_position(output_dir, year=2021):
 
 def generate_world_map(output_dir):
     races = pd.read_csv(os.path.join("data", "races.csv"))
+    results = pd.read_csv(os.path.join("data", "results.csv"))
+    drivers = pd.read_csv(os.path.join("data", "drivers.csv"))
     circuits = pd.read_csv(os.path.join("data", "circuits.csv"))
     races_2021 = races[races["year"] == 2021]
     merged = races_2021.merge(
@@ -468,6 +470,22 @@ def generate_world_map(output_dir):
         'lat': 'latitude',
         'lng': 'longitude'
     })
+    winners_2021 = results[(
+        results["positionText"] == "1")
+        & (results["raceId"].isin(races_2021["raceId"]))
+    ][["raceId", "driverId"]].merge(
+        drivers[
+            [
+                "driverId",
+                "code",
+                "forename",
+                "surname",
+            ]
+        ],
+        on="driverId",
+        how="left",
+    )
+    merged = merged.merge(winners_2021, on="raceId")
 
     def get_flag_base64(country_name: str) -> str:
         try:
@@ -513,12 +531,13 @@ def generate_world_map(output_dir):
             )
         else:
             icon = folium.Icon(color='gray', icon='flag')
-        popup_text = f"{row['race_name']} – {row['circuit_name']} ({row['country']})"
+        popup_text = f"{row['race_name']} <br>–<br> {row['circuit_name']} ({row['country']}) <br>–<br> Winner: {row['forename']} {row['surname']} ({row['code']})"
+        popup = folium.Popup(popup_text, min_width=100, max_width=300)
         folium.Marker(
             location=[lat, lon],
             icon=icon,
-            popup=popup_text,
-            tooltip=row['country']
+            popup=popup,
+            tooltip=row['country'],
         ).add_to(m)
 
     map_path = os.path.join(output_dir, "world_map.html")
