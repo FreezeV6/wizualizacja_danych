@@ -272,7 +272,7 @@ def generate_retirements_per_track(output_dir):
     return img_path, div
 
 
-def retirements_per_constructor(output_dir):
+def generate_retirements_per_constructor(output_dir):
     results = pd.read_csv("data/results.csv")
     status = pd.read_csv("data/status.csv")
     races = pd.read_csv("data/races.csv")
@@ -353,8 +353,7 @@ def retirements_per_constructor(output_dir):
     path = os.path.join(output_dir, "dnf_konstruktorzy_2021.png")
     plt.savefig(path)
     plt.close()
-    return path, ""
-
+    return path
 
 
 def generate_top_10_drivers_by_wins(output_dir):
@@ -550,6 +549,10 @@ def build_html_report(output_dir, html_path):
     img_ret, div_ret = generate_retirements_per_track(output_dir)
     desc_ret = "Liczba wycofań (DNF) na poszczególnych torach podczas sezonu 2021. Tor Hungaroring wyróżniony kolorem czerwonym."
     sections.append(("Wycofania według toru (2021)", desc_ret, img_ret, div_ret))
+
+    img_ret = generate_retirements_per_constructor(output_dir)
+    desc_ret = "Liczba wycofań (DNF) poszczególnych konstruktorów podczas sezonu 2021 z podziałem na przyczyny."
+    sections.append(("Wycofania według konstruktorów (2021)", desc_ret, img_ret, None))
 
     img_dw, div_dw = generate_top_10_drivers_by_wins(output_dir)
     desc_dw = "Dziesięciu kierowców z największą liczbą zwycięstw w wyścigach Formuły 1."
