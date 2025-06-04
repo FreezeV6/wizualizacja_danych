@@ -531,7 +531,7 @@ def generate_world_map(output_dir):
             )
         else:
             icon = folium.Icon(color='gray', icon='flag')
-        popup_text = f"{row['race_name']} <br>–<br> {row['circuit_name']} ({row['country']}) <br>–<br> Winner: {row['forename']} {row['surname']} ({row['code']})"
+        popup_text = f"{row['race_name']} <br>–<br> {row['circuit_name']} ({row['country']}) <br>–<br> Zwycięzca: {row['forename']} {row['surname']} ({row['code']})"
         popup = folium.Popup(popup_text, min_width=100, max_width=300)
         folium.Marker(
             location=[lat, lon],
