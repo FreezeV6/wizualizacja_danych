@@ -53,7 +53,7 @@ def generate_top_10_teams(output_dir):
     }
     colors = [color_map.get(name, "#aaaaaa") for name in top10_plt["name"]]
     plt.figure(figsize=(10, 6))
-    plt.barh(top10_plt["name"], top10_plt["championships"], color=colors)
+    plt.barh(top10_plt["name"], top10_plt["championships"], color=colors, edgecolor="black")
     plt.xlabel("Liczba mistrzostw konstruktorów")
     plt.ylabel("Zespół")
     plt.title("Top 10 konstruktorów według liczby tytułów")
@@ -93,6 +93,7 @@ def generate_avg_pit_stop(output_dir):
         avg_ms, constructors[["constructorId", "name"]], on="constructorId", how="left"
     )
     avg_sorted = avg.sort_values("seconds")
+    general_avg = avg["seconds"].mean()
     team_colors = {
         "Mercedes": "#00D2BE",
         "Red Bull": "#000080",
@@ -112,7 +113,9 @@ def generate_avg_pit_stop(output_dir):
     plt.ylabel("Średni czas pit stopu (sekundy)")
     plt.title("Średni czas pit stopu według drużyn w sezonie 2021")
     plt.ylim(20, 30)
-    plt.xticks(rotation=45)
+    plt.xlim(-1, 10)
+    plt.hlines(general_avg, -1, 10, color="black", linestyles="dashed")
+    plt.text(0.02, general_avg + 0.2, f"Średni czas pit stopu: {round(general_avg, 3)}", fontsize=8, color="black")
     plt.tight_layout()
     img_path = os.path.join(output_dir, "avg_pit_stop.png")
     plt.savefig(img_path)
@@ -200,7 +203,7 @@ def generate_ham_vs_ver(output_dir):
         labels={'round': 'Runda', 'Points': 'Punkty w wyścigu'}
     )
     fig_pts.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
-    div_pts = plot(fig_pts, output_type="div", include_plotlyjs=False)
+    div_pts = plot(fig_pts, output_type="div", include_plotlyjs=True)
 
     fig_cum = px.line(
         df_long_cum,
@@ -213,8 +216,7 @@ def generate_ham_vs_ver(output_dir):
         labels={'round': 'Runda', 'Cumulative Points': 'Skumulowane punkty'}
     )
     fig_cum.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
-    div_cum = plot(fig_cum, output_type="div", include_plotlyjs=False)
-
+    div_cum = plot(fig_cum, output_type="div", include_plotlyjs=True)
     return div_pts, div_cum
 
 def generate_retirements_per_track(output_dir):
@@ -248,7 +250,7 @@ def generate_retirements_per_track(output_dir):
     ]
     plt.figure(figsize=(12, 6))
     plt.barh(
-        retirements_count["name"], retirements_count["retirements_count"], color=colors
+        retirements_count["name"], retirements_count["retirements_count"], color=colors, edgecolor="black"
     )
     plt.xlabel("Liczba wycofań")
     plt.ylabel("Tor wyścigowy")
@@ -268,6 +270,91 @@ def generate_retirements_per_track(output_dir):
     fig.update_layout(xaxis_tickangle=-45)
     div = plot(fig, output_type="div", include_plotlyjs=False)
     return img_path, div
+
+
+def generate_retirements_per_constructor(output_dir):
+    results = pd.read_csv("data/results.csv")
+    status = pd.read_csv("data/status.csv")
+    races = pd.read_csv("data/races.csv")
+    constructors = pd.read_csv("data/constructors.csv")
+    races_2021 = races[races["year"] == 2021]
+    results = results[results["raceId"].isin(races_2021["raceId"])]
+    results = results.merge(status, on="statusId")
+    results = results.merge(constructors, on="constructorId")
+    dnf = results[
+        (~results["status"].str.startswith("+")) &
+        (~results["status"].isin(["Finished", "Disqualified", "Not classified"]))
+    ]
+    category_map = {
+        "Kolizja": ["Collision", "Accident", "Spun off", "Collision damage", "Debris"],
+        "Silnik": ["Engine", "Engine fire", "Engine misfire", "Oil leak", "Oil pressure", "Oil pump", "Oil pipe", "Crankshaft", "Ignition", "Spark plugs", "Turbo", "Oil line"],
+        "Skrzynia biegów / Przeniesienie napędu": ["Gearbox", "Transmission", "Clutch", "Drivetrain", "Differential", "Halfshaft", "Axle", "CV joint"],
+        "Układ elektryczny": ["Electrical", "Electronics", "Battery", "Magneto", "Ignition", "Distributor"],
+        "Chłodzenie": ["Radiator", "Water pressure", "Water leak", "Cooling system", "Water pump", "Water pipe", "Heat shield fire"],
+        "Zawieszenie / Kierowanie": ["Suspension", "Steering", "Handling", "Rear wing", "Front wing", "Broken wing", "Chassis", "Undertray"],
+        "Hamulce": ["Brakes", "Brake duct"],
+        "Opony": ["Tyre", "Puncture", "Tyre puncture", "Wheel", "Wheel nut", "Wheel rim"],
+        "Układ paliwowy": ["Fuel", "Fuel leak", "Fuel pump", "Fuel pressure", "Fuel pipe", "Fuel rig", "Injection"],
+        "Jednostka napędowa / ERS": ["Power loss", "Power Unit", "ERS"],
+        "Usterka mechaniczna": ["Mechanical", "Technical", "Damage", "Stalled", "Throttle", "Vibrations", "Mechanical", "Seat", "Driver Seat"],
+        "Inne": ["Not restarted", "Injury", "Driver unwell", "Illness", "Safety belt", "Excluded", "Retired", "Withdrew", "Did not qualify", "107% Rule", "Disqualified", "Physical", "Safety concerns"]
+    }
+    reverse_map = {}
+    for category, terms in category_map.items():
+        for term in terms:
+            reverse_map[term] = category
+
+    dnf["Kategoria"] = dnf["status"].map(reverse_map).fillna("Inne")
+    grouped = dnf.groupby(["name", "Kategoria"]).size().unstack(fill_value=0)
+    categories_order = [
+        "Kolizja",
+        "Silnik",
+        "Skrzynia biegów / Przeniesienie napędu",
+        "Układ elektryczny",
+        "Chłodzenie",
+        "Zawieszenie / Kierowanie",
+        "Hamulce",
+        "Opony",
+        "Układ paliwowy",
+        "Jednostka napędowa / ERS",
+        "Usterka mechaniczna",
+        "Inne"
+    ]
+    for cat in categories_order:
+        if cat not in grouped.columns:
+            grouped[cat] = 0
+    grouped = grouped[categories_order]
+    grouped = grouped.loc[grouped.sum(axis=1).sort_values(ascending=False).index]
+    colors = [
+        "#db6100",
+        "#108010",
+        "#b40c0d",
+        "#74499c",
+        "#6d392e",
+        "#c159a1",
+        "#a65628",
+        "#272727",
+        "#818108",
+        "#009dae",
+        "#dbdb79",
+        "#C7C7C7",
+    ]
+    fig, ax = plt.subplots(figsize=(14, 8))
+    grouped.plot(kind="barh", stacked=True, color=colors, edgecolor="black", ax=ax)
+    ax.set_title("DNF-y konstruktorów wg przyczyn (sezon 2021)")
+    ax.set_xlabel("Liczba DNF")
+    ax.set_ylabel("Konstruktor")
+    ax.xaxis.set_minor_locator(plt.MultipleLocator(1))
+    ax.tick_params(axis='x', which='minor', length=4, color='gray')
+    ax.tick_params(axis='x', which='major', length=7, color='black')
+    ax.legend(title="Przyczyna", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.tight_layout()
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "dnf_konstruktorzy_2021.png")
+    plt.savefig(path)
+    plt.close()
+    return path
+
 
 def generate_top_10_drivers_by_wins(output_dir):
     results = pd.read_csv(os.path.join("data", "results.csv"))
@@ -291,7 +378,7 @@ def generate_top_10_drivers_by_wins(output_dir):
     colors = plt.cm.get_cmap("tab10")(range(num_bars))
 
     plt.figure(figsize=(10, 6))
-    plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors)
+    plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors, edgecolor="black")
     plt.xlabel("Liczba zwycięstw")
     plt.ylabel("Kierowca")
     plt.title("10 najlepszych kierowców według liczby zwycięstw")
@@ -369,6 +456,8 @@ def generate_laps_per_position(output_dir, year=2021):
 
 def generate_world_map(output_dir):
     races = pd.read_csv(os.path.join("data", "races.csv"))
+    results = pd.read_csv(os.path.join("data", "results.csv"))
+    drivers = pd.read_csv(os.path.join("data", "drivers.csv"))
     circuits = pd.read_csv(os.path.join("data", "circuits.csv"))
     races_2021 = races[races["year"] == 2021]
     merged = races_2021.merge(
@@ -381,9 +470,33 @@ def generate_world_map(output_dir):
         'lat': 'latitude',
         'lng': 'longitude'
     })
+    winners_2021 = results[(
+        results["positionText"] == "1")
+        & (results["raceId"].isin(races_2021["raceId"]))
+    ][["raceId", "driverId"]].merge(
+        drivers[
+            [
+                "driverId",
+                "code",
+                "forename",
+                "surname",
+            ]
+        ],
+        on="driverId",
+        how="left",
+    )
+    merged = merged.merge(winners_2021, on="raceId")
 
     def get_flag_base64(country_name: str) -> str:
         try:
+            if country_name == "USA":
+                country_name = "The United States"
+            elif country_name == "UAE":
+                country_name = "The United Arab Emirates"
+            elif country_name == "UK":
+                country_name = "The United Kingdom"
+            elif country_name == "Netherlands":
+                country_name = "The Netherlands"
             img: Image.Image = fp.get_flag_img(country_name)
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
@@ -418,12 +531,13 @@ def generate_world_map(output_dir):
             )
         else:
             icon = folium.Icon(color='gray', icon='flag')
-        popup_text = f"{row['race_name']} – {row['circuit_name']} ({row['country']})"
+        popup_text = f"{row['race_name']} <br>–<br> {row['circuit_name']} ({row['country']}) <br>–<br> Winner: {row['forename']} {row['surname']} ({row['code']})"
+        popup = folium.Popup(popup_text, min_width=100, max_width=300)
         folium.Marker(
             location=[lat, lon],
             icon=icon,
-            popup=popup_text,
-            tooltip=row['country']
+            popup=popup,
+            tooltip=row['country'],
         ).add_to(m)
 
     map_path = os.path.join(output_dir, "world_map.html")
@@ -454,6 +568,10 @@ def build_html_report(output_dir, html_path):
     img_ret, div_ret = generate_retirements_per_track(output_dir)
     desc_ret = "Liczba wycofań (DNF) na poszczególnych torach podczas sezonu 2021. Tor Hungaroring wyróżniony kolorem czerwonym."
     sections.append(("Wycofania według toru (2021)", desc_ret, img_ret, div_ret))
+
+    img_ret = generate_retirements_per_constructor(output_dir)
+    desc_ret = "Liczba wycofań (DNF) poszczególnych konstruktorów podczas sezonu 2021 z podziałem na przyczyny."
+    sections.append(("Wycofania według konstruktorów (2021)", desc_ret, img_ret, None))
 
     img_dw, div_dw = generate_top_10_drivers_by_wins(output_dir)
     desc_dw = "Dziesięciu kierowców z największą liczbą zwycięstw w wyścigach Formuły 1."
