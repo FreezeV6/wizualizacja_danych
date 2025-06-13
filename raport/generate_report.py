@@ -609,8 +609,6 @@ def build_html_report(output_dir, html_path):
     ]
 
     for i, section in enumerate(sections):
-        if i == 2:
-            html_parts.append("    <h2 style='margin-top: 150px'>Analiza wyników Mistrzostw Świata F1 sezonu 2021</h2>")
         html_parts.append(f"    <h2 style='margin-top: 90px'>{section[0]}</h2>")
         if section[1]:
             img_name = os.path.basename(section[1])
@@ -618,6 +616,8 @@ def build_html_report(output_dir, html_path):
         if section[2]:
             html_parts.append(section[2])
         html_parts.append(f"    <p>{section[3]}</p>")
+        if i == 2:
+            html_parts.append("    <h2 style='margin-top: 150px'>Analiza wyników Mistrzostw Świata F1 sezonu 2021</h2>")
 
     # Add world map section
     map_path = generate_world_map(output_dir)
