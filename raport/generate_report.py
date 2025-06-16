@@ -1,7 +1,9 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import plotly.express as px
+from openpyxl.styles.alignment import horizontal_alignments
 from plotly.offline import plot
 import folium
 import flagpy as fp
@@ -197,17 +199,22 @@ def generate_ham_vs_ver(output_dir):
 
     color_map = {'Verstappen': '#000080', 'Hamilton': '#00D2BE'}
 
-    fig_pts = px.line(
+    fig_pts = px.bar(
         df_long_pts,
         x='round',
         y='Points',
         color='Driver',
         color_discrete_map=color_map,
-        markers=True,
+        barmode="group",
         title='Punkty zdobyte na wyścig – Verstappen vs Hamilton w sezonie 2021',
         labels={'round': 'Runda', 'Points': 'Punkty w wyścigu'}
     )
-    fig_pts.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
+    fig_pts.update_layout(xaxis=dict(dtick=1),
+                          legend_title_text='Kierowca',
+                          template="plotly_white",
+                          xaxis_showgrid=False,
+                          yaxis_showgrid=False
+                          )
     div_pts = plot(fig_pts, output_type="div", include_plotlyjs=True)
 
     fig_cum = px.line(
@@ -220,7 +227,12 @@ def generate_ham_vs_ver(output_dir):
         title='Skumulowane zdobyte punkty – Verstappen vs Hamilton w sezonie 2021',
         labels={'round': 'Runda', 'Cumulative Points': 'Skumulowane punkty'}
     )
-    fig_cum.update_layout(xaxis=dict(dtick=1), legend_title_text='Kierowca')
+    fig_cum.update_layout(xaxis=dict(dtick=1),
+                          legend_title_text='Kierowca',
+                          template="plotly_white",
+                          xaxis_showgrid=False,
+                          yaxis_showgrid=False
+                          )
     div_cum = plot(fig_cum, output_type="div", include_plotlyjs=True)
     return div_pts, div_cum
 
@@ -333,18 +345,7 @@ def generate_retirements_per_constructor(output_dir):
             grouped[cat] = 0
     grouped = grouped[categories_order]
     grouped = grouped.loc[grouped.sum(axis=1).sort_values(ascending=False).index]
-    colors = [
-        "#db6100",
-        "#108010",
-        "#b40c0d",
-        "#74499c",
-        "#c159a1",
-        "#a65628",
-        "#272727",
-        "#009dae",
-        "#dbdb79",
-        "#C7C7C7",
-    ]
+    colors = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f','#e5c494','#b3b3b3', '#754b48', '#b03a2e']
     fig, ax = plt.subplots(figsize=(14, 8))
     grouped.plot(kind="barh", stacked=True, color=colors, edgecolor="black", ax=ax)
     ax.set_title("DNF-y konstruktorów z uwzględnieniem przyczyn w sezonie 2021")
@@ -362,58 +363,98 @@ def generate_retirements_per_constructor(output_dir):
     return path
 
 
-def generate_top_10_drivers_by_wins(output_dir):
+def generate_all_time_top10_drivers(output_dir, min_starts=8):
     results = pd.read_csv(os.path.join("data", "results.csv"))
+    races   = pd.read_csv(os.path.join("data", "races.csv"))
     drivers = pd.read_csv(os.path.join("data", "drivers.csv"))
 
-    winners = results[results["positionOrder"] == 1]
-    wins_per_driver = (
-        winners.groupby("driverId")
-        .size()
-        .reset_index(name="wins")
-    )
-    top_winners = wins_per_driver.merge(
-        drivers[["driverId", "forename", "surname"]], on="driverId", how="left"
-    )
-    top_winners["full_name"] = top_winners["forename"] + " " + top_winners["surname"]
-    top_winners = top_winners.sort_values(by="wins", ascending=False).reset_index(drop=True)
-    top_10_winners = top_winners.head(10).copy()
-    top_10_winners_plt = top_10_winners.sort_values(by="wins", ascending=True)
-    num_bars = len(top_10_winners_plt)
-    colors = plt.cm.get_cmap("tab10")(range(num_bars))
+    total_starts = results.groupby("driverId").size().reset_index(name="starts")
+    wins = (results[results["positionOrder"] == 1]
+            .groupby("driverId").size().reset_index(name="wins"))
+    podiums = (results[results["positionOrder"].isin([1, 2, 3])]
+               .groupby("driverId").size().reset_index(name="podiums"))
+    points_df = (results.groupby("driverId")["points"]
+                 .sum().reset_index(name="total_points"))
+    avg_pps = (points_df
+               .merge(total_starts, on="driverId", how="left")
+               .assign(avg_pps=lambda df: df["total_points"] / df["starts"])
+               [["driverId", "avg_pps"]])
 
-    plt.figure(figsize=(10, 6))
-    plt.barh(top_10_winners_plt["full_name"], top_10_winners_plt["wins"], color=colors, edgecolor="black")
-    plt.xlabel("Liczba zwycięstw")
-    plt.ylabel("Kierowca")
-    plt.title("Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw")
+    season = results.merge(races[["raceId", "year"]], on="raceId", how="left")
+    season_pts = (season.groupby(["year","driverId"])["points"]
+                  .sum().reset_index(name="season_points"))
+    season_wins = (season[season["positionOrder"] == 1]
+                   .groupby(["year","driverId"])
+                   .size().reset_index(name="season_wins"))
+    season_stats = (season_pts
+                    .merge(season_wins, on=["year","driverId"], how="left")
+                    .fillna(0))
+    season_stats = season_stats.sort_values(
+        ["year", "season_points", "season_wins"],
+        ascending=[True, False, False]
+    )
+    champions = season_stats.groupby("year").first().reset_index()
+    titles = champions.groupby("driverId").size().reset_index(name="titles")
+
+    df = (total_starts
+          .merge(wins,      on="driverId", how="left")
+          .merge(podiums,   on="driverId", how="left")
+          .merge(points_df, on="driverId", how="left")
+          .merge(avg_pps,   on="driverId", how="left")
+          .merge(titles,    on="driverId", how="left")
+          .fillna(0))
+
+    df = df[df["starts"] >= min_starts]
+    df["win_rate"]    = df["wins"]    / df["starts"] * 100
+    df["podium_rate"] = df["podiums"] / df["starts"] * 100
+
+    for col in ["win_rate", "podium_rate", "titles", "avg_pps"]:
+        mn, mx = df[col].min(), df[col].max()
+        df[col + "_n"] = (df[col] - mn) / (mx - mn) if mx > mn else 0
+
+    df["score"] = (
+        0.35 * df["win_rate_n"] +
+        0.25 * df["podium_rate_n"] +
+        0.25 * df["titles_n"] +
+        0.15 * df["avg_pps_n"]
+    )
+
+    drivers["full_name"] = drivers["forename"] + " " + drivers["surname"]
+    df = df.merge(drivers[["driverId","full_name"]], on="driverId", how="left")
+
+    top10 = (df.sort_values("score", ascending=False)
+              .head(10)
+              [["full_name","starts","wins","win_rate",
+                "podiums","podium_rate","titles",
+                "total_points","avg_pps","score"]]
+              .sort_values("score", ascending=True))
+
+    os.makedirs(output_dir, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = plt.cm.get_cmap("Set3")(range(10))
+    ax.barh(top10["full_name"], top10["score"], color=colors, edgecolor="black")
+    ax.set_xlabel("Wynik")
+    ax.set_ylabel("Kierowca")
+    ax.set_title("Top 10 kierowców wszech czasów (składany wskaźnik)")
+    ax.grid(False)
     plt.tight_layout()
-    img_path = os.path.join(output_dir, "top_10_drivers_by_wins.png")
+
+    img_path = os.path.join(output_dir, "all_time_top10_drivers.png")
     plt.savefig(img_path)
     plt.close()
 
-    fig = px.bar(
-        top_10_winners,
-        x="full_name",
-        y="wins",
-        title="Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw",
-        labels={"full_name": "Kierowca", "wins": "Liczba zwycięstw"},
-    )
-    fig.update_layout(xaxis_tickangle=-45)
-    div = plot(fig, output_type="div", include_plotlyjs=False)
-    return img_path, div
-
+    return img_path
 
 def generate_laps_per_position(output_dir, year=2021):
     lap_times = pd.read_csv(os.path.join("data", "lap_times.csv"))
-    drivers = pd.read_csv(os.path.join("data", "drivers.csv"))
-    races = pd.read_csv(os.path.join("data", "races.csv"))
+    drivers   = pd.read_csv(os.path.join("data", "drivers.csv"))
+    races     = pd.read_csv(os.path.join("data", "races.csv"))
 
     drivers['driver_name'] = drivers['forename'] + ' ' + drivers['surname']
     driver_map = drivers.set_index('driverId')['driver_name']
 
-    race_ids_season = races[races['year'] == year]['raceId']
-    lap_times_season = lap_times[lap_times['raceId'].isin(race_ids_season)]
+    race_ids_season    = races[races['year'] == year]['raceId']
+    lap_times_season   = lap_times[lap_times['raceId'].isin(race_ids_season)]
 
     counts = (
         lap_times_season
@@ -425,40 +466,53 @@ def generate_laps_per_position(output_dir, year=2021):
     pivot = counts.pivot(index='driverId', columns='position', values='laps').fillna(0)
     pivot.index = pivot.index.map(driver_map)
 
-    if 1 in pivot.columns:
-        pivot = pivot.sort_values(by=1, ascending=False)
     pivot = pivot.reindex(sorted(pivot.columns), axis=1)
 
-    data = pivot.values
+    most_freq_pos = pivot.idxmax(axis=1)
+    pivot = pivot.assign(most_freq = most_freq_pos)
+    pivot = pivot.sort_values(by='most_freq')
+    pivot = pivot.drop(columns='most_freq')
+
+    data   = pivot.values
     n_rows, n_cols = data.shape
 
     fig, ax = plt.subplots(figsize=(12, 8))
-    c = ax.pcolormesh(data, cmap='turbo', edgecolors='white', linewidth=0.5)
+    colors = ["white", "orange", "red", "brown"]
+    c = ax.pcolormesh(data, cmap= LinearSegmentedColormap.from_list("white_to_red", colors), edgecolors='white', linewidth=0.5)
     ax.invert_yaxis()
 
     for i in range(n_rows):
         for j in range(n_cols):
             val = int(data[i, j])
             if val > 0:
-                text_color = 'white' if data[i, j] < data.max() / 4 else 'black'
-                ax.text(j + 0.5, i + 0.5, val, ha='center', va='center', color=text_color, fontsize=8)
+                color = 'black' if data.max() / 1.2 > val else 'white'
+                # color = "black"
+                ax.text(j + 0.5, i + 0.5, val,
+                        ha='center', va='center',
+                        color=color, fontsize=8)
 
     ax.set_xticks(range(n_cols))
     ax.set_xticklabels(pivot.columns, rotation=0)
     ax.set_yticks([i + 0.5 for i in range(n_rows)])
     ax.set_yticklabels(pivot.index)
-
+    ticks = ax.get_xticks()
+    labels = [str(t + 1) for t in ticks]
+    ax.set_xticks(ticks + 0.5)
+    ax.set_xticklabels(labels)
+    ax.tick_params(axis='x', which='both', length=0)
     ax.set_xlabel('Pozycja')
     ax.set_ylabel('Kierowca')
     ax.set_title(f'Liczba okrążeń spędzonych na poszczególnych pozycjach przez kierowcę w sezonie {year}')
     fig.colorbar(c, ax=ax, label='Liczba okrążeń')
 
     plt.tight_layout()
+    os.makedirs(output_dir, exist_ok=True)
     img_path = os.path.join(output_dir, f"laps_per_position_{year}.png")
     plt.savefig(img_path)
     plt.close()
 
     return img_path
+
 
 
 def generate_world_map(output_dir):
@@ -494,7 +548,7 @@ def generate_world_map(output_dir):
     )
     merged = merged.merge(winners_2021, on="raceId")
 
-    def get_flag_base64(country_name: str) -> str:
+    def get_flag_base64(country_name: str) -> str | None:
         try:
             if country_name == "USA":
                 country_name = "The United States"
@@ -558,41 +612,144 @@ def build_html_report(output_dir, html_path):
     sections = []
 
     img_races = generate_number_of_races(output_dir)
-    long_desc_races = "Powyższy wykres liniowy obrazuje, jak w poszczególnych latach rosła liczba wyścigów Formuły 1 od początku istniania 1950 do 2024. Na osi poziomej znajduje się rok, natomiast oś pionowa przedstawia liczbę Grand Prix (rund) rozgrywanych w danym sezonie. Punkty i łącząca je linia pokazują stopniowy wzrost ilości organizowanych rajdów od około 10 wyścigów w latach 50. do około 16–17 w latach 80. i 90., a później aż do rekordowych 22–24 wyścigów w ostatnich latach. Dodatkowo, czerwone, przerywane pionowe linie oraz wypełnione tło oznaczają okres pandemii COVID-19 (2020–2023), kiedy kalendarz uległ skróceniu (np. w 2020 roku spadek do 17 wyścigów). Dzięki tej wizualizacji łatwo dostrzec ogólny trend rozrostu mistrzostw oraz wyjątkowe odchylenia spowodowane globalnymi wydarzeniami."
+    long_desc_races = """
+    <div style='text-align:left'>
+      <p>Powyższy wykres liniowy obrazuje, jak w poszczególnych latach rosła liczba wyścigów Formuły 1 od początku istnienia w 1950 do 2024 roku.</p>
+      <ul>
+        <li><strong>Oś pozioma</strong>: rok.</li>
+        <li><strong>Oś pionowa</strong>: liczba Grand Prix rozgrywanych w danym sezonie.</li>
+      </ul>
+      <p>Krzywa pokazuje stopniowy wzrost kalendarza – od około 8 wyścigów w latach 50., przez 16–17 w latach 80. i 90., aż do rekordowych 22–24 rund w ostatnich sezonach.</p>
+      <p>Dodatkowo zaznaczono okres pandemii COVID-19 (<em>2020–2023</em>) za pomocą przerywanych linii i wypełnionego tła, uwidaczniając spadek liczby wyścigów (do 17 w 2020).</p>
+      <p>Wizualizacja pozwala łatwo dostrzec ogólny trend rozwoju mistrzostw oraz wyjątkowe odchylenia spowodowane globalnymi wydarzeniami.</p>
+    </div>
+    """
     sections.append(("Liczba wyścigów w latach 1950-2024", img_races, None, long_desc_races))
 
     img_t10, div_t10 = generate_top_10_teams(output_dir)
-    long_desc_t10 = "Powyższy wykres prezentuje dziesięć najbardziej utytułowanych zespołów w historii Formuły 1. Oś pionowa zawiera nazwy konstruktorów, natomiast oś pozioma to łączna liczba zdobytych tytułów mistrza konstruktorów. Ferrari dominuje z 16 tytułami, co stanowi najwyższy wynik, następnie McLaren i Williams posiadają po 9 tytułów każdy, a Mercedes plasuje się na czwartym miejscu z 8. Red Bull może się pochwalić 6 wieńcami, natomiast klasyczne marki, jak Team Lotus (4) czy Cooper-Climax (2), również znalazły się w zestawieniu. Kolory słupków odnoszą się do barw charakterystycznych dla danego zespołu. Taki wykres umożliwia porównanie sukcesów historycznych zespołów i odzwierciedla ewolucję dominacji różnych drużyn."
+    long_desc_t10 = """
+    <div style='text-align:left'>
+      <p>Powyższy wykres słupkowy przedstawia ranking dziesięciu najbardziej utytułowanych zespołów w historii Formuły 1.</p>
+      <ul>
+        <li><strong>Oś pionowa</strong>: nazwy konstruktorów.</li>
+        <li><strong>Oś pozioma</strong>: łączna liczba tytułów mistrza konstruktorów.</li>
+      </ul>
+      <p>Ferrari dominuje z 16 tytułami, następnie McLaren i Williams (po 9), Mercedes (8) oraz Red Bull (6). W zestawieniu są także Team Lotus (4) i Cooper-Climax (2).</p>
+      <p>Słupki pokolorowano zgodnie z barwami charakterystycznymi dla poszczególnych ekip, co ułatwia porównanie ich historycznych sukcesów.</p>
+    </div>
+    """
     sections.append(("Ranking 10 najlepszych konstruktorów według liczby tytułów", img_t10, None, long_desc_t10))
 
-    img_dw, div_dw = generate_top_10_drivers_by_wins(output_dir)
-    long_desc_t10_drivers = "Na poziomym wykresie słupkowym zestawiono dziesięciu kierowców, którzy w historii Formuły 1 odnieśli najwięcej triumfów. Oś pionowa prezentuje nazwiska kierowców, zaś oś pozioma – liczbę zwycięstw. Lewis Hamilton stoi na czele z imponującymi 105 wygranymi, tuż za nim Michael Schumacher z 91 zwycięstwami. Max Verstappen, pomimo młodego wieku, osiągnął 63 triumfów, wyprzedzając legendy pokroju Vettela i Prosta."
+    img_dw = generate_all_time_top10_drivers(output_dir)
+    long_desc_t10_drivers =  """
+                        <div style='text-align: left'>
+                            <p>Powyższy wykres to poziomy diagram słupkowy przedstawiający <strong>Top 10 kierowców wszech czasów</strong> według składanego wskaźnika (<em>wynik</em>). Na osi pionowej wypisano nazwiska dziesięciu najlepszych zawodników, a na osi poziomej znajduje się wartość ich łącznego <strong>wyniku</strong>, znormalizowaną do przedziału od 0 do 1. Słupki ułożono rosnąco od dołu do góry, co ułatwia bezpośrednie porównanie osiągnięć.</p>
+                            
+                            <p><strong>Jak liczony jest wynik?</strong></p>
+                            <ul>
+                              <li><strong>Współczynnik wygranych (Win rate)</strong> – procent zwycięstw w stosunku do wszystkich startów, przeskalowany do [0,1].</li>
+                              <li><strong>Współczynnik zdobytych podiów (Podium rate)</strong> – procent miejsc na podium (1–3) w stosunku do liczby startów, znormalizowany.</li>
+                              <li><strong>Tytuły (Titles)</strong> – liczba tytułów mistrza świata, obliczona na podstawie sumy punktów w sezonie (z dogrywką według liczby zwycięstw), a następnie znormalizowana.</li>
+                              <li><strong>Śr. punktów na wyścig (Avg points per start)</strong> – średnia liczba punktów na wyścig, również znormalizowana.</li>
+                            </ul>
+                            
+                            <p>Każdą ze znormalizowanych metryk pomnożono przez przydzieloną wagę:</p>
+                            <ul>
+                              <li>35 % dla <em>win rate</em>,</li>
+                              <li>25 % dla <em>podium rate</em>,</li>
+                              <li>25 % dla <em>titles</em>,</li>
+                              <li>15 % dla <em>avg points per start</em>.</li>
+                            </ul>
+                            <p>Ich suma stanowi końcową wartość <em>wyniku</em>, dzięki czemu bierze on pod uwagę zarówno dominację w zwycięstwach, stałą obecność na podium, liczbę tytułów, jak i konsekwentne zdobywanie punktów.</p>
+                            
+                            <p><strong>Wyniki interpretujemy następująco:</strong></p>
+                            <ul>
+                              <li><strong>Lewis Hamilton</strong> zajmuje pierwsze miejsce dzięki rekordowej liczbie zwycięstw, tytułów oraz wysokiej średniej punktów.</li>
+                              <li><strong>Juan Manuel Fangio</strong> plasuje się tuż za nim jako pięciokrotny mistrz ery klasycznej F1.</li>
+                              <li><strong>Max Verstappen</strong> i <strong>Michael Schumacher</strong> zajmują kolejne pozycje, obrazując zarówno współczesną dominację, jak i imponujące osiągnięcia w latach 90. i 2000.</li>
+                              <li>W pierwszej dziesiątce znajdują się także <strong>Alain Prost</strong>, <strong>Alberto Ascari</strong>, <strong>Jim Clark</strong>, <strong>Sebastian Vettel</strong>, <strong>Jackie Stewart</strong> i <strong>Ayrton Senna</strong>, co potwierdza ich trwałe dziedzictwo.</li>
+                            </ul>
+                            
+                            <p>Taka konstrukcja wskaźnika pozwala ocenić kierowców kompleksowo, uwzględniając skuteczność, stabilność oraz mistrzostwo na przestrzeni całej kariery.</p>
+                        </div>
+                            """
     sections.append(
-        ("Ranking 10 najlepszych kierowców ze względu na liczbę zwycięstw", img_dw, None, long_desc_t10_drivers))
+        ("Ranking 10 najskuteczniejszych kierowców ze względu na stosunek zwyciestw do startów", img_dw, None, long_desc_t10_drivers))
 
     img_pit, div_pit = generate_avg_pit_stop(output_dir)
-    long_desc_pit_stop = "Wykres kolumnowy ukazuje, jak efektywne w zmianie kół były poszczególne zespoły w sezonie 2021. Na osi poziomej widnieją nazwy dziesięciu ekip, a na osi pionowej – średni czas pit stopu wyrażony w sekundach.  Przerywana linia pozioma wskazuje ogólną średnią dla wszystkich zespołów (około 25,4 s), co pozwala zorientować się, które zespoły były poniżej lub powyżej tej wartości. Tego typu analiza pokazuje, że Red Bull i Ferrari dysponowały najsprawniej działającymi pit stopami, co często przekładało się na zyski czasowe podczas wyścigów, zaś Haas notował najwolniejsze przestoje, co mogło negatywnie wpływać na ich osiągi w stawce."
+    long_desc_pit_stop = """
+    <div style='text-align:left'>
+      <p>Powyższy wykres kolumnowy ilustruje średni czas pit stopu (w sekundach) poszczególnych zespołów w sezonie 2021.</p>
+      <ul>
+        <li><strong>Oś pozioma</strong>: nazwy drużyn.</li>
+        <li><strong>Oś pionowa</strong>: średni czas pit stopu.</li>
+      </ul>
+      <p>Przerywana linia pozioma wskazuje ogólną średnią (~25,4 s) dla wszystkich ekip. Szybsze niż średnia są Red Bull i Ferrari, zaś najwolniejsze – Haas.</p>
+      <p>Analiza pomaga zrozumieć znaczenie szybkich pit stopów dla strategii wyścigowych i ostatecznych wyników.</p>
+    </div>
+    """
     sections.append(("Średni czas pit stopu według zespołów w sezonie 2021", img_pit, None, long_desc_pit_stop))
 
     img_ret, div_ret = generate_retirements_per_track(output_dir)
-    long_desc_retirements_per_track = "Powyższy wykres słupkowy przedstawia, ile razy kierowcy musieli wycofać się z wyścigu na każdym torze kalendarza 2021. Na osi pionowej znajdują się nazwy obiektów, a oś pozioma pokazuje liczbę DNF-ów (Did Not Finish) w danym Grand Prix. Największą liczbę wycofań odnotowano na Hungaroringu – aż 7 kierowców nie ukończyło wyścigu, co jest spowodowane ogromnym wypadkiem na pierwszym okrążeniu. Tuż za nim plasuje się Yas Marina (6 DNF-ów), a dalej Monza i Jeddah – po 5. Kolejne obiekty notowały od 4 do zaledwie 1 wycofania (np. Algarve, Barcelona). Dzięki tej wizualizacji można ocenić, na których torach sezonu 2021 najczęściej dochodziło do awarii lub wypadków, co pomaga zrozumieć specyfikę każdego obiektu i wyzwań stawianych przed zawodnikami."
+    long_desc_retirements_per_track = """
+    <div style='text-align:left'>
+      <p>Powyższy wykres słupkowy pokazuje liczbę wycofań (DNF) kierowców na poszczególnych torach w sezonie 2021.</p>
+      <ul>
+        <li><strong>Oś pionowa</strong>: nazwy torów.</li>
+        <li><strong>Oś pozioma</strong>: liczba DNF.</li>
+      </ul>
+      <p>Najwięcej DNF miało miejsce na Hungaroringu (7), co wiązało się z dużą kolizją na starcie. Kolejne są Yas Marina (6), Monza i Jeddah (po 5).</p>
+      <p>Wizualizacja umożliwia identyfikację torów o największym ryzyku wycofań związanych z wypadkami lub awariami.</p>
+    </div>
+    """
     sections.append(("DNF-y według toru w sezonie 2021", img_ret, None, long_desc_retirements_per_track))
 
     img_ret = generate_retirements_per_constructor(output_dir)
-    long_desc_retirements_per_constr = "Stosowany, poziomy wykres słupkowy pokazuje łączną liczbę wycofań (DNF) każdego z dziesięciu zespołów w sezonie 2021 wraz z rozbiciem na kategorie przyczyn. Oś pionowa to nazwy ekip, natomiast oś pozioma – liczba DNF. Poszczególne kolory w słupkach oznaczają konkretne źródło awarii.  Williams zaliczył aż 11 wycofań – najwięcej w stawce; w większości z powodu kolizji (5 DNF), problemy ze skrzynią biegów (3) i inne kategorie. Dzięki takiemu rozbiciu widać, w których zespołach najczęściej dochodziło do wypadków, a w których dominowały awarie techniczne, co może służyć jako punkt wyjścia do analizy niezawodności bolidów i stylu jazdy kierowców poszczególnych dużyn."
+    long_desc_retirements_per_constr = """
+    <div style='text-align:left'>
+      <p>Powyższy wykres słupkowy prezentuje liczbę wycofań (DNF) każdego z dziesięciu zespołów w sezonie 2021, rozbitych według przyczyn.</p>
+      <ul>
+        <li><strong>Oś pionowa</strong>: nazwy konstruktorów.</li>
+        <li><strong>Oś pozioma</strong>: łączna liczba DNF.</li>
+      </ul>
+      <p>Kolory reprezentują poszczególne przyczyny wycofań, takie jak awarie silnika, skrzyni biegów czy kolizje.</p>
+      <p>Williams przoduje z 11 DNF, głównie z powodu kolizji (5) i problemów technicznych (6). Wykres ukazuje niezawodność bolidów i styl jazdy kierowców.</p>
+    </div>
+    """
     sections.append(("DNF-y konstruktorów z uwzględnieniem przyczyn w sezonie 2021", img_ret, None,
                      long_desc_retirements_per_constr))
 
     div_ham_pts, div_ham_cum = generate_ham_vs_ver(output_dir)
-    long_descr_ham_ver = "Powyższe wykresy przedstawiają sezon Formuły 1 z 2021 roku, porównując wyniki Red Bulla Maxa Verstappena oraz Mercedesa Lewisa Hamiltona. Pierwszy z nich (“Punkty zdobyte na wyścigu”) ilustruje punktację w każdej z 22 rund sezonu. Na osi poziomej oznaczono numer rundy, a na osi pionowej liczbę punktów zdobytych w danym wyścigu. Można zauważyć, że w początkowych wyścigach oba nazwiska wymieniały się na czele: w rundzie 1 Verstappen zdobył maksymalne 25 punktów, podczas gdy Hamilton zdobył 18, w drugiej sytuacja się odwróciła, a następnie oba kierowcy utrzymywali się w okolicach czołówki. Runda 6 przyniosła zerowy dorobek obu zawodników, co odzwierciedla się wspólnym minimum. W kolejnych wyścigach zdarzały się gwałtowne spadki, na przykład Hamilton w rundzie 11 nie zdobył punktów, a Verstappen w tej samej rundzie uzyskał najwyższy wynik. Drugi wykres (“Skumulowane punkty”) prezentuje progres sumarycznej punktacji obu kierowców w miarę upływu kolejnych wyścigów. Linia obu zawodników startuje w tym samym miejscu, ale już od połowy sezonu widać narastającą przewagę Verstappena, która ulegała minimalnym wyrównaniom, np. po rundzie 10 wynik był zbliżony. Do ostatniej rundy sześcio-punktowa różnica między nimi świadczy o niezwykle wyrównanym pojedynku o tytuł, który ostatecznie padł łupem Verstappena."
+    long_descr_ham_ver = """
+    <div style='text-align:left'>
+      <p>Powyższe wykresy porównują sezon 2021 między Maxem Verstappenem (Red Bull) a Lewisem Hamiltonem (Mercedes).</p>
+      <p><strong>Punkty za wyścig</strong>: liczba punktów zdobytych przez obu kierowców w każdej z 22 rund.</p>
+      <p><strong>Skumulowane punkty</strong>: progres sumy punktów w kolejnych wyścigach, pokazujący momenty zmiany przewagi.</p>
+      <ul>
+        <li>Runda 1: Verstappen 25 pkt vs. Hamilton 18 pkt.</li>
+        <li>Runda 2: przewaga Hamiltona.</li>
+        <li>Runda 6: obaj – 0 pkt.</li>
+        <li>Końcowa różnica: Verstappen wygrywa sezon o 8 pkt.</li>
+      </ul>
+      <p>Wizualizacja pozwala śledzić kluczowe momenty pojedynku o tytuł mistrzowski.</p>
+    </div>
+    """
     sections.append(("Hamilton vs Verstappen w sezonie 2021", None, div_ham_pts + div_ham_cum, long_descr_ham_ver))
 
     img_laps = generate_laps_per_position(output_dir, year=2021)
-    long_descr_laps_per_pos = "Powyższa mapa cieplna przedstawia, ile okrążeń w sezonie 2021 każdy z wybranych kierowców przejechał na poszczególnych pozycjach od 1. do 20. Wiersze reprezentują nazwiska zawodników  zaś kolumny – miejsca na torze w kolejnych okrążeniach. Kolory skali od granatowego (niewiele okrążeń) przez zielony po żółty i czerwony (dużo okrążeń) wskazują, na których pozycjach dany kierowca spędził najwięcej czasu.  Ta mapa pozwala szybko analizować, jak poszczególni zawodnicy kontrolowali tor i jak długo utrzymywali swoją pozycję w wyścigu, odzwierciedlając ich regularność i konkurencyjność."
+    long_descr_laps_per_pos = """
+    <div style='text-align:left'>
+      <p>Powyższa mapa cieplna obrazuje liczby okrążeń, które każdy kierowca przejechał na poszczególnych pozycjach (1–20) w sezonie 2021.</p>
+      <ul>
+        <li>Wiersze: nazwiska kierowców.</li>
+        <li>Kolumny: zajmowane pozycje.</li>
+        <li>Skala kolorów: biały (rzadko) → żółć → pomarańcz → czerwień (często).</li>
+      </ul>
+      <p>Mapa szybko pokazuje, jak długo poszczególni zawodnicy utrzymywali daną pozycję, co odzwierciedla ich strategię i niezawodność bolidu.</p>
+    </div>
+    """
     sections.append(("Liczba okrążeń spędzonych na poszczególnych pozycjach przez kierowcę w sezonie 2021", img_laps,
                      None, long_descr_laps_per_pos))
-
-    # Build HTML
 
     html_parts = [
         "<!DOCTYPE html>",
